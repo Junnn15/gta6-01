@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solmar Heat — an open-world crime game</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a1a12; font-family: 'Segoe UI', Arial, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hidden { display: none !important; }
+
+  /* --- HUD --- */
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; z-index: 5; }
+  .panel { background: rgba(8, 20, 14, 0.62); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 8px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #topleft { position: absolute; top: 14px; left: 14px; min-width: 240px; }
+  #health-bar { width: 100%; height: 12px; background: rgba(255,255,255,0.18); border-radius: 6px; overflow: hidden; margin: 4px 0 6px; }
+  #health-fill { height: 100%; width: 100%; background: #4caf50; transition: width 0.2s; }
+  #health-row { display: flex; justify-content: space-between; font-size: 12px; letter-spacing: 1px; }
+  #money { font-size: 24px; font-weight: 800; color: #7dff9a; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+  #debt { font-size: 12px; color: #ffd27d; margin-top: 2px; }
+  #stars { font-size: 26px; letter-spacing: 4px; color: #555; text-shadow: 0 2px 4px rgba(0,0,0,0.7); margin-top: 4px; }
+  #stars.hot { color: #ffd700; }
+  #minimap-wrap { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #minimap { width: 170px; height: 170px; border: 2px solid rgba(255,255,255,0.35); border-radius: 50%; background: rgba(10,26,18,0.7); box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+  #minimap-label { font-size: 11px; letter-spacing: 3px; color: #ffe08a; margin-top: 4px; text-shadow: 0 1px 3px #000; }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 700; letter-spacing: 0.5px; text-shadow: 0 2px 4px #000; background: rgba(8,20,14,0.55); padding: 7px 16px; border-radius: 20px; border: 1px solid rgba(255,200,50,0.45); max-width: 60vw; text-align: center; }
+  #bottomright { position: absolute; right: 16px; bottom: 16px; text-align: right; }
+  #ammo { font-size: 20px; font-weight: 800; text-shadow: 0 2px 4px #000; }
+  #speed { font-size: 30px; font-weight: 800; color: #ffe08a; text-shadow: 0 2px 4px #000; margin-top: 2px; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 3px #000; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #interact { position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%); font-size: 17px; font-weight: 700; background: rgba(8,20,14,0.75); border: 1px solid #ffd27d; padding: 8px 18px; border-radius: 8px; }
+  #message { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: min(560px, 86vw); text-align: center; background: rgba(8,20,14,0.78); border: 1px solid rgba(255,200,50,0.6); border-radius: 10px; padding: 14px 18px; }
+  #message-title { font-size: 22px; font-weight: 800; color: #ffd27d; margin-bottom: 6px; }
+  #message-body { font-size: 15px; line-height: 1.45; }
+  #busted-timer { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); font-size: 24px; font-weight: 900; color: #ff5252; text-shadow: 0 0 12px #000; animation: blink 0.5s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  /* --- Menus --- */
+  #menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #fff; background: linear-gradient(180deg, rgba(6,26,18,0.55) 0%, rgba(6,26,18,0.82) 100%); cursor: pointer; padding: 20px; }
+  #menu-title { font-size: min(72px, 11vw); font-weight: 900; letter-spacing: 4px; color: #ffd27d; text-shadow: 0 4px 0 #b85a3a, 0 8px 24px rgba(0,0,0,0.8); margin: 0; }
+  #menu-subtitle { font-size: 16px; letter-spacing: 6px; color: #7dff9a; margin: 6px 0 22px; }
+  #menu-body { font-size: 17px; line-height: 1.7; max-width: 620px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 18px 26px; }
+  #menu-hint { margin-top: 26px; font-size: 15px; letter-spacing: 2px; color: #ffe08a; animation: blink 1.2s steps(2) infinite; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="Solmar Heat: an open-world crime game. Explore the city of Solmar on foot and by car, complete Marta's missions and pay off the debt."></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud" class="hidden">
+  <div id="topleft" class="panel">
+    <div id="health-row"><span>HEALTH</span><span id="health-text">100</span></div>
+    <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="money">$0</div>
+    <div id="debt">Debt: $8,000 / $8,000</div>
+    <div id="stars">☆☆☆☆☆</div>
+  </div>
+  <div id="minimap-wrap">
+    <canvas id="minimap" width="170" height="170"></canvas>
+    <div id="minimap-label">SOLMAR</div>
+  </div>
+  <div id="objective">Find Marta's next job</div>
+  <div id="bottomright">
+    <div id="ammo">AMMO 12 / 120</div>
+    <div id="speed"></div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="interact" class="hidden"></div>
+  <div id="message" class="hidden">
+    <div id="message-title"></div>
+    <div id="message-body"></div>
+  </div>
+  <div id="busted-timer" class="hidden"></div>
+</div>
+
+<div id="menu" class="hidden">
+  <h1 id="menu-title">SOLMAR HEAT</h1>
+  <div id="menu-subtitle">SUN &middot; SAND &middot; EIGHT GRAND OF TROUBLE</div>
+  <div id="menu-body"></div>
+  <div id="menu-hint">Click or press ENTER to start</div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
